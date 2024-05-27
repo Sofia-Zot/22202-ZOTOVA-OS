@@ -36,8 +36,10 @@ void reverse_string(char *buffer, size_t length) {
 void add_path_component(char *path, char *component) {
     size_t path_length = strlen(path);
     size_t component_length = strlen(component);
-    path[path_length] = '/';
-    path[path_length + 1] = '\0';
+    if (path_length > 0) {
+        path[path_length] = '/';
+        path[path_length + 1] = '\0';
+    }
     strncat(path, component, component_length);
 }
 
@@ -51,7 +53,7 @@ int reverse_file_copy(const char *source_path, const char *destination_path) {
         return -1;
     }
 
-    destination_file_descriptor = open(destination_path, O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR);
+    destination_file_descriptor = open(destination_path, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
 
     if (destination_file_descriptor < 0) {
         perror("Could not open destination file");
@@ -98,49 +100,44 @@ void reverse_directory(const char *source_path, const char *destination_path) {
     }
 
     strncpy(original_directory, source_path, strlen(source_path));
-    char *delimiter_position = strrchr(source_path, '/');
-    char temporary_buffer[256];
-    size_t temporary_buffer_length;
-    if (delimiter_position != NULL) {
-        temporary_buffer_length = strlen(delimiter_position) - 1;
-        strncpy(temporary_buffer, delimiter_position + 1, temporary_buffer_length);
-    } else {
-        temporary_buffer_length = strlen(source_path);
-        strncpy(temporary_buffer, source_path, temporary_buffer_length);
+
+    // Разделяем источник на компоненты пути и реверсируем их
+    char *component = strtok(original_directory, "/");
+    char *reversed_component = NULL;
+    while (component != NULL) {
+        reversed_component = malloc(strlen(component) + 1);
+        strcpy(reversed_component, component);
+        reverse_string(reversed_component, strlen(reversed_component));
+        add_path_component(reversed_directory, reversed_component); // Добавили обратно
+        free(reversed_component);
+        component = strtok(NULL, "/");
     }
 
-    reverse_string(temporary_buffer, temporary_buffer_length);
-    add_path_component(reversed_directory, temporary_buffer);
-
+    // Создаем реверсированную директорию
     int result_code = mkdir(reversed_directory, S_IRWXU);
     if (result_code != 0) {
         perror("Could not create reversed directory");
         return;
     }
 
-    size_t original_directory_end_index = strlen(original_directory);
-    size_t reversed_directory_end_index = strlen(reversed_directory);
-    char *original_file_path = original_directory;
-    char *reversed_file_path = reversed_directory;
+    // Обрабатываем файлы и директории
     for (struct dirent *entry = readdir(directory_stream); entry != NULL; entry = readdir(directory_stream)) {
         if (entry->d_type == DT_REG) {
-            original_file_path[original_directory_end_index] = '\0';
-            reversed_file_path[reversed_directory_end_index] = '\0';
+            // Обработка файлов
+            char original_file_path[256];
+            char reversed_file_path[256];
+
+            strcpy(original_file_path, source_path);
+            strcpy(reversed_file_path, reversed_directory);
+
+            // Реверсируем имя файла
+            char *reversed_filename = malloc(strlen(entry->d_name) + 1);
+            strcpy(reversed_filename, entry->d_name);
+            reverse_string(reversed_filename, strlen(reversed_filename));
+            add_path_component(reversed_file_path, reversed_filename); // Добавляем реверсированное имя файла
+            free(reversed_filename);
 
             add_path_component(original_file_path, entry->d_name);
-
-            char *extension_position = strrchr(entry->d_name, '.');
-            size_t length_to_reverse = 0;
-
-            if (extension_position != NULL) {
-                length_to_reverse = extension_position - entry->d_name;
-            } else {
-                length_to_reverse = strlen(entry->d_name);
-            }
-
-            reverse_string(entry->d_name, length_to_reverse);
-
-            add_path_component(reversed_file_path, entry->d_name);
 
             int result = reverse_file_copy(original_file_path, reversed_file_path);
             if (result != 0) {
@@ -150,19 +147,26 @@ void reverse_directory(const char *source_path, const char *destination_path) {
             if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
                 continue;
             }
+            // Обработка директорий
+            char *original_subdirectory = malloc(strlen(original_directory) + strlen(entry->d_name) + 2);
+            strcpy(original_subdirectory, original_directory);
+            add_path_component(original_subdirectory, entry->d_name);
 
-            original_file_path[original_directory_end_index] = '\0';
-            reversed_file_path[reversed_directory_end_index] = '\0';
+            char *reversed_subdirectory = malloc(strlen(reversed_directory) + strlen(entry->d_name) + 2);
+            strcpy(reversed_subdirectory, reversed_directory);
 
-            add_path_component(original_file_path, entry->d_name);
+            // Реверсируем имя поддиректории
+            char *reversed_component = malloc(strlen(entry->d_name) + 1);
+            strcpy(reversed_component, entry->d_name);
+            reverse_string(reversed_component, strlen(reversed_component));
+            add_path_component(reversed_subdirectory, reversed_component); 
+            free(reversed_component);
 
-            char *reversed_subdirectory = malloc(strlen(entry->d_name) + 1);
-            strcpy(reversed_subdirectory, entry->d_name);
-            reverse_string(reversed_subdirectory, strlen(reversed_subdirectory));
-            add_path_component(reversed_file_path, reversed_subdirectory);
+            // Рекурсивный вызов для поддиректории
+            reverse_directory(original_subdirectory, reversed_subdirectory);
+
+            free(original_subdirectory);
             free(reversed_subdirectory);
-
-            reverse_directory(original_file_path, reversed_file_path);
         }
     }
 
