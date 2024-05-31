@@ -1,0 +1,84 @@
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <signal.h>
+#include <sys/mman.h>
+
+#define PAGE_SIZE 4096
+
+
+void recursion(int depth) {
+    char buff[PAGE_SIZE]; 
+    memset(buff, 0, PAGE_SIZE);
+    printf("Recursion depth: %d\n", depth);
+    sleep(1);
+
+    if (depth < 5) { // Control the recursion depth
+        recursion(depth + 1);
+    }
+}
+
+
+void cycle() {
+    int size = 10;
+    int *mem[size];
+    for (int i = 0; i < size; i++) {
+        mem[i] = malloc(1024 * 1024); // Allocate memory on the heap
+        printf("Allocated memory block %d\n", i);
+        sleep(1);
+    }
+
+    for (int i = 0; i < size; i++) {
+        free(mem[i]);
+        printf("Freed memory block %d\n", i);
+    }
+}
+
+
+void sig_handler(int sig) {
+    perror("Received SIGSEGV");
+    sleep(3);
+    exit(1);
+}
+
+int main(int argc, char *argv[]) {
+    printf("PID: %d\n", getpid());
+    signal(SIGSEGV, sig_handler);
+    sleep(10);
+
+
+    // recursion(1);
+
+    // cycle();
+
+    int *p = mmap(NULL, PAGE_SIZE * 10, PROT_NONE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+    if (p == MAP_FAILED) {
+        perror("mmap failed");
+        exit(1);
+    }
+    printf("Memory mapped 10 pages\n");
+    sleep(3);
+
+    if (mprotect(p, PAGE_SIZE * 10, PROT_READ | PROT_WRITE) == -1) {
+        perror("mprotect failed");
+        exit(1);
+    }
+    printf("Memory protected for read and write\n");
+    sleep(3);
+
+    p[0] = 1;
+    printf("Wrote to memory mapped region\n");
+    sleep(3);
+
+    if (munmap(p + PAGE_SIZE * 4, PAGE_SIZE * 2) == -1) {
+        perror("munmap failed");
+        exit(1);
+    }
+    printf("Unmapped pages 4 to 6\n");
+    sleep(3);
+
+    p[4 * PAGE_SIZE / sizeof(int)] = 1; 
+
+    return 0;
+}
