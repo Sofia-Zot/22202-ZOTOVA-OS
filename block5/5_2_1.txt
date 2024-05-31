@@ -1,0 +1,45 @@
+#include <stdlib.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <sys/wait.h>
+
+int global_var = 42;
+
+int main() {
+    int local_var = 15;
+    printf("Локальная переменная: адрес %p, значение %d\n", &local_var, local_var);
+    printf("Глобальная переменная: адрес %p, значение %d\n", &global_var, global_var);
+    printf("PID: %d\n", getpid());
+    int pid = fork();
+
+    if (pid == -1) {
+        perror("Ошибка при создании процесса");
+        return 1;
+    }
+
+    if (pid == 0) {
+        printf("Я дочерний процесс, мой PID: %d, PID родителя: %d\n", getpid(), getppid());
+        printf("дп: локальная переменная: адрес %p, значение %d\n", &local_var, local_var);
+        printf("дп: глобальная переменная: адрес %p, значение %d\n", &global_var, global_var);
+
+        local_var = 100; 
+        global_var = 77;
+
+        printf("дп: измененная локальная переменная: адрес %p, значение %d\n", &local_var, local_var);
+        printf("дп: измененная глобальная переменная: адрес %p, значение %d\n", &global_var, global_var);
+
+        while (1) { 
+            
+        }
+
+        exit(5); (не будет выполнено)
+    } else {
+        printf("Родительский процесс, мой PID: %d\n", getpid());
+        printf("рп: локальная переменная: адрес %p, значение %d\n", &local_var, local_var);
+        printf("рп: глобальная переменная: адрес %p, значение %d\n", &global_var, global_var);
+
+        printf("Зомби-процесс с PID: %d\n", pid);
+        fflush(stdout); 
+
+        sleep(30); 
+    }

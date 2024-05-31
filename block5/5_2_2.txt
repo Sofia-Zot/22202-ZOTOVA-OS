@@ -1,0 +1,66 @@
+#include <stdlib.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <sys/wait.h>
+
+int global_var = 42;
+
+int main() {
+    int local_var = 15;
+    printf("Локальная переменная: адрес %p, значение %d\n", &local_var, local_var);
+    printf("Глобальная переменная: адрес %p, значение %d\n", &global_var, global_var);
+    printf("PID: %d\n", getpid());
+    int pid = fork();
+
+    if (pid == -1) {
+        perror("Ошибка при создании процесса");
+        return 1;
+    }
+
+    if (pid == 0) { 
+        printf("Я первый дочерний процесс, мой PID: %d, PID родителя: %d\n", getpid(), getppid());
+        printf("1дп: локальная переменная: адрес %p, значение %d\n", &local_var, local_var);
+        printf("1дп: глобальная переменная: адрес %p, значение %d\n", &global_var, global_var);
+
+        int new_pid = fork(); 
+
+        if (new_pid == -1) {
+            perror("Ошибка при создании процесса");
+            return 1;
+        }
+
+        if (new_pid == 0) { 
+            printf("Я второй дочерний процесс, мой PID: %d, PID родителя: %d\n", getpid(), getppid());
+            printf("2дп: локальная переменная: адрес %p, значение %d\n", &local_var, local_var);
+            printf("2дп: глобальная переменная: адрес %p, значение %d\n", &global_var, global_var);
+
+            printf("PID родителя перед изменением: %d\n", getppid());
+            fflush(stdout);
+            sleep(5); 
+
+            printf("PID родителя после изменения: %d\n", getppid());
+            fflush(stdout);
+
+            //  sleep(30); 
+            while(1) {
+                 
+            }
+        } else { 
+            printf("Я первый дочерний процесс, мой PID: %d, PID родителя: %d\n", getpid(), getppid());
+            printf("1дп: локальная переменная: адрес %p, значение %d\n", &local_var, local_var);
+            printf("1дп: глобальная переменная: адрес %p, значение %d\n", &global_var, global_var);
+
+            sleep(2); 
+            printf("Зомби-родитель с PID: %d\n", getpid());
+            printf("PID второго дочернего: %d\n", new_pid);
+            exit(5); 
+        }
+    } else {
+        //  sleep(50); 
+        while(1) {
+            
+        }
+    }
+
+    return 0;
+}
