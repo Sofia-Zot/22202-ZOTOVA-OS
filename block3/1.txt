@@ -101,7 +101,6 @@ void reverse_directory(const char *source_path, const char *destination_path) {
 
     strncpy(original_directory, source_path, strlen(source_path));
 
-    // Разделяем источник на компоненты пути и реверсируем их
     char *component = strtok(original_directory, "/");
     char *reversed_component = NULL;
     while (component != NULL) {
@@ -113,24 +112,20 @@ void reverse_directory(const char *source_path, const char *destination_path) {
         component = strtok(NULL, "/");
     }
 
-    // Создаем реверсированную директорию
     int result_code = mkdir(reversed_directory, S_IRWXU);
     if (result_code != 0) {
         perror("Could not create reversed directory");
         return;
     }
 
-    // Обрабатываем файлы и директории
     for (struct dirent *entry = readdir(directory_stream); entry != NULL; entry = readdir(directory_stream)) {
         if (entry->d_type == DT_REG) {
-            // Обработка файлов
             char original_file_path[256];
             char reversed_file_path[256];
 
             strcpy(original_file_path, source_path);
             strcpy(reversed_file_path, reversed_directory);
 
-            // Реверсируем имя файла
             char *reversed_filename = malloc(strlen(entry->d_name) + 1);
             strcpy(reversed_filename, entry->d_name);
             reverse_string(reversed_filename, strlen(reversed_filename));
@@ -147,7 +142,6 @@ void reverse_directory(const char *source_path, const char *destination_path) {
             if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
                 continue;
             }
-            // Обработка директорий
             char *original_subdirectory = malloc(strlen(original_directory) + strlen(entry->d_name) + 2);
             strcpy(original_subdirectory, original_directory);
             add_path_component(original_subdirectory, entry->d_name);
@@ -155,14 +149,12 @@ void reverse_directory(const char *source_path, const char *destination_path) {
             char *reversed_subdirectory = malloc(strlen(reversed_directory) + strlen(entry->d_name) + 2);
             strcpy(reversed_subdirectory, reversed_directory);
 
-            // Реверсируем имя поддиректории
             char *reversed_component = malloc(strlen(entry->d_name) + 1);
             strcpy(reversed_component, entry->d_name);
             reverse_string(reversed_component, strlen(reversed_component));
             add_path_component(reversed_subdirectory, reversed_component); 
             free(reversed_component);
 
-            // Рекурсивный вызов для поддиректории
             reverse_directory(original_subdirectory, reversed_subdirectory);
 
             free(original_subdirectory);
