@@ -1,0 +1,73 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <sys/un.h>
+#include <signal.h>
+#include <errno.h>
+
+#define BUFF_SIZE 1024
+#define PORT 25565
+
+
+int main() {
+    int sfd;
+    char buffer[BUFF_SIZE];
+    struct sockaddr_in srv_sockaddr, clt_sockaddr;
+
+    // Создание сокета
+    sfd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sfd == -1) {
+        printf("Ошибка создания сокета: %s\n", strerror(errno));
+        exit(1);
+    }
+
+    // Инициализация адреса сервера
+    memset(&srv_sockaddr, 0, sizeof(srv_sockaddr));
+    memset(&clt_sockaddr, 0, sizeof(clt_sockaddr));
+    srv_sockaddr.sin_family = AF_INET;
+    srv_sockaddr.sin_port = htons(PORT);
+    srv_sockaddr.sin_addr.s_addr = INADDR_ANY;
+
+    // Связывание сокета с адресом
+    if (bind(sfd, (struct sockaddr*)&srv_sockaddr, sizeof(srv_sockaddr)) == -1) {
+        printf("Ошибка связывания: %s\n", strerror(errno));
+        close(sfd);
+        exit(1);
+    }
+
+    socklen_t len = sizeof(clt_sockaddr);
+    int n;
+
+    while (1) {
+        printf("Ожидание сообщения от клиента...\n");
+
+        // Получение сообщения от клиента
+        n = recvfrom(sfd, buffer, BUFF_SIZE, 0, (struct sockaddr *)&clt_sockaddr, &len);
+        if (n == -1) {
+            printf("Ошибка получения сообщения: %s\n", strerror(errno));
+            close(sfd);
+            exit(1);
+        }
+        buffer[n] = '\0';
+
+        printf("Получено сообщение: %s\n", buffer);
+        sleep(1);
+
+        // Отправка сообщения обратно клиенту
+        if (sendto(sfd, buffer, strlen(buffer), 0, (struct sockaddr*)&clt_sockaddr, len) == -1) {
+            printf("Ошибка отправки ответа: %s\n", strerror(errno));
+            close(sfd);
+            exit(1);
+        }
+
+        printf("Сообщение отправлено обратно.\n\n");
+        sleep(1);
+    }
+    close(sfd);
+    return 0;
+}
