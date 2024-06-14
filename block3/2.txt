@@ -1,0 +1,189 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <dirent.h>
+#include <string.h>
+#include <fcntl.h>
+
+#define BUF_SIZE 1024
+#define NAME_LENGTH 256
+
+// Создание каталога
+void create_directory(char path[]) {
+    if (mkdir(path, S_IRWXU | S_IRWXG | S_IROTH) != 0) {
+        perror("mkdir");
+    }
+}
+
+// Вывод содержимого каталога
+void list_directory_contents(char path[]) {
+    DIR *dir = opendir(path);
+    struct dirent *entry;
+    if(dir == NULL) {
+        perror("diropen");
+        return;
+    }
+    while ((entry = readdir(dir)) != NULL) {
+        if(strcmp(entry->d_name, ".") != 0 && strcmp(entry->d_name, "..") != 0) {
+            printf("%s\n", entry->d_name);
+        }
+    }
+    closedir(dir);
+}
+
+// Удаление каталога
+void remove_directory(char path[]) {
+    if (rmdir(path)) {
+        perror("rmdir");
+    }
+}
+
+// Создание файла
+void create_file(char path[]) {
+    int fd2 = open(path, O_CREAT | O_WRONLY | O_TRUNC, S_IRWXU | S_IRWXG | S_IROTH);
+    if (fd2 == -1) {
+        printf("enable to create a file + %s\n", path);
+        perror("open fd2");
+    }
+    close(fd2);
+}
+
+// Вывод содержимого файла
+void print_file_contents(char path[]) {
+    char line[32];
+    FILE *file = fopen(path, "r");
+    if (file == NULL) {
+        printf("error: cant open file %s\n", path);
+        return;
+    }
+    while (fgets(line, sizeof(line), file) != NULL) {
+        printf("%s", line);
+    }
+    fclose(file);
+}
+
+// Удаление файла
+void remove_file(char path[]) {
+    if (remove(path) != 0 ) {
+        perror("remove");
+    }
+}
+
+// Создание символической ссылки
+void create_symlink(char src[], char dest[]) {
+    if (symlink(src, dest) != 0) {
+        perror("symlink");
+    }
+}
+
+// Вывод содержимого символической ссылки
+void print_symlink_contents(char* filePath) {
+    char buffer[BUF_SIZE];
+    int name_len = (int) readlink(filePath, buffer, BUF_SIZE);
+    if (name_len == -1) {
+        perror("readlink");
+        return;
+    }
+    buffer[name_len] = '\n';
+    int bytes_written = (int) write(1, buffer, name_len + 1);
+
+    if(bytes_written != name_len + 1) {
+        perror("write");
+        return;
+    }
+}
+
+// Вывод содержимого файла, на который ссылается символическая ссылка
+void read_symlink_target(char path[]) {
+    char buffer[BUF_SIZE];
+    int name_len = (int) readlink(path, buffer, BUF_SIZE);
+    if (name_len == -1) {
+        perror("readlink");
+        return;
+    }
+    buffer[name_len] = '\0';
+    print_file_contents(buffer);
+}
+
+// Создание жесткой ссылки
+void create_hardlink(char src[], char dest[]) {
+    if (link(src, dest) != 0) {
+        perror("link");
+    }
+}
+
+// Вывод прав доступа
+void print_file_permissions(char path[]) {
+    struct stat stat_info;
+    if (stat(path, &stat_info) != 0) {
+        perror("stat");
+        return;
+    }
+    printf("mode: 0%o\n", stat_info.st_mode & 0777);
+    printf("number of hard links %ld\n", stat_info.st_nlink);
+}
+
+// Изменение прав доступа
+void change_file_permissions(char path[], mode_t new_mode) {
+    if (chmod(path, new_mode) != 0) {
+        perror("chmod");
+    }
+}
+
+// Преобразует имя функции из argv[0] в удобный формат
+void convert_func_name(char *src, char *dest) {
+    int len = strlen(src);
+    int count = len;
+    for (int i = 1; i <= len && (src[len - i] != '/'); ++i) {
+        count = i;
+    }
+    for (int i = 0; i < NAME_LENGTH; ++i) {dest[i] = '\0';}
+    for (int i = len - count; i < len; i++) {
+        dest[i - (len - count)] = src[i];
+    }
+}
+
+int main(int argc, char *argv[]) {
+    if (argc < 2) {
+        printf("not enough args");
+        exit(EXIT_FAILURE);
+    }
+    char file_name[NAME_LENGTH];
+    convert_func_name(argv[0], file_name);
+
+    if (argc == 2) {
+        if (strcmp(file_name, "create_directory") == 0) {
+            create_directory(argv[1]);
+        } else if (strcmp(file_name, "list_directory_contents") == 0) {
+            list_directory_contents(argv[1]);
+        } else if (strcmp(file_name, "remove_directory") == 0) {
+            remove_directory(argv[1]);
+        } else if (strcmp(file_name, "create_file") == 0) {
+            create_file(argv[1]);
+        } else if (strcmp(file_name, "print_file_contents") == 0) {
+            print_file_contents(argv[1]);
+        } else if (strcmp(file_name, "remove_file") == 0) {
+            remove_file(argv[1]);
+        } else if (strcmp(file_name, "print_file_permissions") == 0) {
+            print_file_permissions(argv[1]);
+        } else if (strcmp(file_name, "print_symlink_contents") == 0) {
+            print_symlink_contents(argv[1]);
+        } else if (strcmp(file_name, "read_symlink_target") == 0) {
+            read_symlink_target(argv[1]);
+        }
+        return 0;
+    }
+
+    if (argc == 3) {
+        if (strcmp(file_name, "create_symlink") == 0) {
+            create_symlink(argv[1], argv[2]);
+        } else if (strcmp(file_name, "create_hardlink") == 0) {
+            create_hardlink(argv[1], argv[2]);
+        } else if (strcmp(file_name, "change_file_permissions") == 0) {
+            change_file_permissions(argv[1], strtoll( argv[2], NULL, 8));
+        }
+    }
+    printf("\n");
+    return 0;
+}
